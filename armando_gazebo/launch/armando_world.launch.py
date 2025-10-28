@@ -10,7 +10,7 @@ from launch_ros.substitutions import FindPackageShare
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch.conditions import IfCondition
-
+from launch.actions import TimerAction
 def generate_launch_description():
 
     # Path to packages
@@ -22,7 +22,10 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')
         ),
-        launch_arguments={'gz_args': '-r empty.sdf'}.items(),
+    launch_arguments={
+        'gz_args': '-r empty.sdf',
+        'publish_clock': 'true'
+    }.items(),
     )
 
     #urdf_path = os.path.join(pkg_armando_description, "urdf", "arm.urdf")
@@ -39,7 +42,7 @@ def generate_launch_description():
         package='robot_state_publisher',
         executable='robot_state_publisher',
         output='screen',
-        parameters=[robot_description_param],
+        parameters=[robot_description_param, {"use_sim_time": True}],
     )
 
     # Spawn robot entity in Gazebo
@@ -50,13 +53,19 @@ def generate_launch_description():
         arguments=[
             '-topic', '/robot_description',
             '-name', 'armando',
-            '-allow_renaming', 'true',
             '-z', '0.3'
         ],
     )
 
+    # Clock bridge to keep simulation time and ROS2 time synchronized
+    clock_bridge = Node(
+     package="ros_ign_bridge",
+     executable="parameter_bridge",
+     arguments=['/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock'],
+     output="screen",
+ )
     # Camera bridge
-    bridge_camera = Node(
+    camera_bridge = Node(
         package='ros_ign_bridge', 
         executable='parameter_bridge',
         arguments=[
@@ -72,5 +81,6 @@ def generate_launch_description():
         gazebo_launch,
         load_robot_description_node,
         spawn_entity_node,
-        bridge_camera
+        clock_bridge,
+        camera_bridge
     ])
